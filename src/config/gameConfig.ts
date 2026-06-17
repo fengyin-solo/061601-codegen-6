@@ -305,7 +305,136 @@ export const gameConfig: GameConfig = {
     { type: 'work', name: '打工', icon: '💼', description: '辛苦工作赚取代币', energyCost: 2 }
   ],
 
-  workRewards: { min: 15, max: 35 }
+  workRewards: { min: 15, max: 35 },
+
+  dailyGoalCount: 3,
+
+  dailyGoals: [
+    {
+      id: 'chat_once',
+      type: 'chat',
+      title: '日常问候',
+      description: '和任意角色聊天1次',
+      icon: '💬',
+      targetCount: 1,
+      reward: 10,
+      difficulty: 'easy',
+      characterSpecific: false
+    },
+    {
+      id: 'chat_twice',
+      type: 'chat',
+      title: '畅聊时光',
+      description: '和任意角色聊天2次',
+      icon: '🗣️',
+      targetCount: 2,
+      reward: 20,
+      difficulty: 'medium',
+      characterSpecific: false
+    },
+    {
+      id: 'chat_with_character',
+      type: 'chat',
+      title: '专属陪伴',
+      description: '和指定角色聊天1次',
+      icon: '💕',
+      targetCount: 1,
+      reward: 15,
+      difficulty: 'easy',
+      characterSpecific: true
+    },
+    {
+      id: 'give_gift',
+      type: 'gift',
+      title: '心意满满',
+      description: '给任意角色送1份礼物',
+      icon: '🎁',
+      targetCount: 1,
+      reward: 20,
+      difficulty: 'easy',
+      characterSpecific: false
+    },
+    {
+      id: 'give_gift_character',
+      type: 'gift',
+      title: '专属礼物',
+      description: '给指定角色送1份礼物',
+      icon: '💝',
+      targetCount: 1,
+      reward: 25,
+      difficulty: 'medium',
+      characterSpecific: true
+    },
+    {
+      id: 'work_once',
+      type: 'work',
+      title: '努力奋斗',
+      description: '打工1次',
+      icon: '💼',
+      targetCount: 1,
+      reward: 15,
+      difficulty: 'easy',
+      characterSpecific: false
+    },
+    {
+      id: 'work_twice',
+      type: 'work',
+      title: '辛勤耕耘',
+      description: '打工2次',
+      icon: '🏆',
+      targetCount: 2,
+      reward: 30,
+      difficulty: 'hard',
+      characterSpecific: false
+    },
+    {
+      id: 'gain_affinity_small',
+      type: 'affinity',
+      title: '好感提升',
+      description: '任意角色好感度提升5点',
+      icon: '📈',
+      targetCount: 1,
+      targetValue: 5,
+      reward: 20,
+      difficulty: 'easy',
+      characterSpecific: false
+    },
+    {
+      id: 'gain_affinity_medium',
+      type: 'affinity',
+      title: '感情升温',
+      description: '指定角色好感度提升10点',
+      icon: '❤️',
+      targetCount: 1,
+      targetValue: 10,
+      reward: 35,
+      difficulty: 'hard',
+      characterSpecific: true
+    },
+    {
+      id: 'boost_mood',
+      type: 'mood',
+      title: '心情愉快',
+      description: '让任意角色心情达到良好以上',
+      icon: '😊',
+      targetCount: 1,
+      targetValue: 60,
+      reward: 15,
+      difficulty: 'medium',
+      characterSpecific: false
+    },
+    {
+      id: 'multi_chat_three',
+      type: 'multi_chat',
+      title: '社交达人',
+      description: '和3个不同角色各聊天1次',
+      icon: '🌟',
+      targetCount: 3,
+      reward: 40,
+      difficulty: 'hard',
+      characterSpecific: false
+    }
+  ]
 }
 
 export default gameConfig

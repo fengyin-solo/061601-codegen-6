@@ -83,6 +83,40 @@ export interface ActionConfig {
   energyCost: number
 }
 
+export type DailyGoalType = 'chat' | 'gift' | 'work' | 'affinity' | 'mood' | 'multi_chat'
+
+export interface DailyGoalTemplate {
+  id: string
+  type: DailyGoalType
+  title: string
+  description: string
+  icon: string
+  targetCount: number
+  targetValue?: number
+  reward: number
+  difficulty: 'easy' | 'medium' | 'hard'
+  characterSpecific?: boolean
+}
+
+export interface DailyGoal {
+  id: string
+  templateId: string
+  type: DailyGoalType
+  title: string
+  description: string
+  icon: string
+  targetCount: number
+  currentCount: number
+  targetValue?: number
+  currentValue?: number
+  characterId?: string
+  characterName?: string
+  reward: number
+  completed: boolean
+  claimed: boolean
+  suggestion: string
+}
+
 export interface GameConfig {
   title: string
   initialResources: number
@@ -101,4 +135,6 @@ export interface GameConfig {
   events: GameEventConfig[]
   actions: ActionConfig[]
   workRewards: { min: number; max: number }
+  dailyGoals: DailyGoalTemplate[]
+  dailyGoalCount: number
 }

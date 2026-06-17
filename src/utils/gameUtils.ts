@@ -1,4 +1,4 @@
-import type { TimeOfDay, MoodLevel, GameConfig, CharacterConfig } from '../types/game'
+import type { TimeOfDay, MoodLevel, GameConfig, CharacterConfig, DailyGoalTemplate, DailyGoal } from '../types/game'
 
 export function getMoodLevel(mood: number): MoodLevel {
   if (mood >= 80) return 'happy'
@@ -155,4 +155,119 @@ export function calculateGiftAffinity(
   baseChange *= moodMultiplier
 
   return Math.round(baseChange * 10) / 10
+}
+
+export function generateDailyGoals(
+  templates: DailyGoalTemplate[],
+  count: number,
+  day: number,
+  unlockedCharacters: { id: string; name: string }[]
+): DailyGoal[] {
+  if (unlockedCharacters.length === 0) return []
+
+  const shuffled = [...templates].sort(() => Math.random() - 0.5)
+  const selected: DailyGoalTemplate[] = []
+  const selectedTypes = new Set<string>()
+
+  for (const template of shuffled) {
+    if (selected.length >= count) break
+    if (selectedTypes.has(template.type) && template.type !== 'chat') continue
+    if (template.characterSpecific && unlockedCharacters.length < 1) continue
+    selected.push(template)
+    selectedTypes.add(template.type)
+  }
+
+  while (selected.length < count && shuffled.length > selected.length) {
+    const remaining = shuffled.filter(t => !selected.includes(t))
+    if (remaining.length === 0) break
+    selected.push(remaining[0])
+  }
+
+  return selected.map((template, index) => {
+    const goal: DailyGoal = {
+      id: `goal_${day}_${index}_${template.id}`,
+      templateId: template.id,
+      type: template.type,
+      title: template.title,
+      description: template.description,
+      icon: template.icon,
+      targetCount: template.targetCount,
+      currentCount: 0,
+      reward: template.reward,
+      completed: false,
+      claimed: false,
+      suggestion: ''
+    }
+
+    if (template.targetValue !== undefined) {
+      goal.targetValue = template.targetValue
+      goal.currentValue = 0
+    }
+
+    if (template.characterSpecific) {
+      const randomChar = unlockedCharacters[Math.floor(Math.random() * unlockedCharacters.length)]
+      goal.characterId = randomChar.id
+      goal.characterName = randomChar.name
+      goal.description = template.description.replace('指定角色', randomChar.name)
+    }
+
+    goal.suggestion = generateGoalSuggestion(goal)
+
+    return goal
+  })
+}
+
+export function generateGoalSuggestion(goal: DailyGoal): string {
+  switch (goal.type) {
+    case 'chat':
+      if (goal.characterId) {
+        return `💡 建议：去和${goal.characterName}聊聊天吧，聊聊ta感兴趣的话题效果更好哦~`
+      }
+      return '💡 建议：选择一个角色开始聊天，能增进感情哦~'
+    case 'gift':
+      if (goal.characterId) {
+        return `💡 建议：送${goal.characterName}一份ta喜欢的礼物，好感度会翻倍！`
+      }
+      return '💡 建议：送礼物是快速提升好感的好方法~'
+    case 'work':
+      return '💡 建议：打工虽然会让角色们有点失落，但能赚取不少代币呢！'
+    case 'affinity':
+      if (goal.characterId) {
+        return `💡 建议：多和${goal.characterName}互动，送ta喜欢的礼物能快速提升好感~`
+      }
+      return '💡 建议：和角色聊天、送礼物都能提升好感度哦~'
+    case 'mood':
+      return '💡 建议：聊天和送喜欢的礼物都能让角色心情变好~'
+    case 'multi_chat':
+      return '💡 建议：多和不同的角色互动，拓展你的社交圈吧~'
+    default:
+      return '💡 建议：完成目标获得奖励吧！'
+  }
+}
+
+export function getDifficultyLabel(difficulty: string): string {
+  const labels: Record<string, string> = {
+    easy: '简单',
+    medium: '中等',
+    hard: '困难'
+  }
+  return labels[difficulty] || '普通'
+}
+
+export function getDifficultyColor(difficulty: string): string {
+  const colors: Record<string, string> = {
+    easy: '#22c55e',
+    medium: '#f59e0b',
+    hard: '#ef4444'
+  }
+  return colors[difficulty] || '#94a3b8'
+}
+
+export function shuffleArray<T>(array: T[]): T[] {
+  const result = [...array]
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[result[i], result[j]] = [result[j], result[i]]
+  }
+  return result
 }

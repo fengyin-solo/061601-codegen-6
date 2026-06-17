@@ -4,6 +4,7 @@ import { useGameStore } from './stores/gameStore'
 import { useSaveStore } from './stores/saveStore'
 import TopBar from './components/TopBar.vue'
 import CharacterPanel from './components/CharacterPanel.vue'
+import DailyGoals from './components/DailyGoals.vue'
 import ActionPanel from './components/ActionPanel.vue'
 import LogPanel from './components/LogPanel.vue'
 import EventModal from './components/EventModal.vue'
@@ -59,6 +60,7 @@ onMounted(() => {
     <div class="main-content">
       <div class="left-column">
         <CharacterPanel />
+        <DailyGoals />
         <ActionPanel @open-gift="showGiftModal = true" />
       </div>
       

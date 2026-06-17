@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { TimeOfDay, ActionType, GameEventConfig, EventChoice } from '../types/game'
+import type { TimeOfDay, ActionType, GameEventConfig, EventChoice, DailyGoal } from '../types/game'
 import gameConfig from '../config/gameConfig'
 import {
   clamp,
@@ -11,7 +11,8 @@ import {
   isGiftDisliked,
   getTimeLabel,
   getNextTimeSlot,
-  getMoodLabel
+  getMoodLabel,
+  generateDailyGoals
 } from '../utils/gameUtils'
 
 export interface CharacterState {
@@ -31,6 +32,12 @@ export interface LogEntry {
   timestamp: number
 }
 
+export interface CharacterBaseline {
+  id: string
+  affinity: number
+  mood: number
+}
+
 export interface HistorySnapshot {
   day: number
   timeSlot: TimeOfDay
@@ -41,6 +48,9 @@ export interface HistorySnapshot {
   triggeredEvents: string[]
   collectedCards: string[]
   logs: LogEntry[]
+  dailyGoals: DailyGoal[]
+  dailyCharacterBaseline: CharacterBaseline[]
+  chattedCharacters: string[]
 }
 
 export const useGameStore = defineStore('game', () => {
@@ -65,6 +75,9 @@ export const useGameStore = defineStore('game', () => {
   const flags = ref<string[]>([])
   const triggeredEvents = ref<string[]>([])
   const collectedCards = ref<string[]>([])
+  const dailyGoals = ref<DailyGoal[]>([])
+  const dailyCharacterBaseline = ref<CharacterBaseline[]>([])
+  const chattedCharacters = ref<string[]>([])
   const logs = ref<LogEntry[]>([])
   const history = ref<HistorySnapshot[]>([])
   let logIdCounter = 0
@@ -79,6 +92,18 @@ export const useGameStore = defineStore('game', () => {
 
   const currentCharacterConfig = computed(() =>
     gameConfig.characters.find(c => c.id === selectedCharacterId.value) || null
+  )
+
+  const completedGoals = computed(() =>
+    dailyGoals.value.filter(g => g.completed && !g.claimed)
+  )
+
+  const totalDailyReward = computed(() =>
+    dailyGoals.value.reduce((sum, g) => g.completed && !g.claimed ? sum + g.reward : sum, 0)
+  )
+
+  const unclaimedGoalsCount = computed(() =>
+    dailyGoals.value.filter(g => g.completed && !g.claimed).length
   )
 
   function addLog(type: LogEntry['type'], message: string, characterId?: string) {
@@ -103,7 +128,10 @@ export const useGameStore = defineStore('game', () => {
       flags: [...flags.value],
       triggeredEvents: [...triggeredEvents.value],
       collectedCards: [...collectedCards.value],
-      logs: JSON.parse(JSON.stringify(logs.value))
+      logs: JSON.parse(JSON.stringify(logs.value)),
+      dailyGoals: JSON.parse(JSON.stringify(dailyGoals.value)),
+      dailyCharacterBaseline: JSON.parse(JSON.stringify(dailyCharacterBaseline.value)),
+      chattedCharacters: [...chattedCharacters.value]
     })
     if (history.value.length > 100) {
       history.value.shift()
@@ -121,6 +149,9 @@ export const useGameStore = defineStore('game', () => {
     flags.value = [...snapshot.flags]
     triggeredEvents.value = [...snapshot.triggeredEvents]
     collectedCards.value = [...snapshot.collectedCards]
+    dailyGoals.value = JSON.parse(JSON.stringify(snapshot.dailyGoals || []))
+    dailyCharacterBaseline.value = JSON.parse(JSON.stringify(snapshot.dailyCharacterBaseline || []))
+    chattedCharacters.value = [...(snapshot.chattedCharacters || [])]
     logs.value = JSON.parse(JSON.stringify(snapshot.logs))
     history.value = history.value.slice(0, stepIndex)
     addLog('system', `回退到第 ${snapshot.day} 天 ${getTimeLabel(snapshot.timeSlot)}`)
@@ -167,6 +198,161 @@ export const useGameStore = defineStore('game', () => {
     char.mood = clamp(char.mood + change, gameConfig.minMood, gameConfig.maxMood)
   }
 
+  function initDailyGoals() {
+    const unlockedChars = characters.value
+      .filter(c => c.unlocked)
+      .map(c => {
+        const config = gameConfig.characters.find(cc => cc.id === c.id)
+        return { id: c.id, name: config?.name || c.id }
+      })
+
+    dailyGoals.value = generateDailyGoals(
+      gameConfig.dailyGoals,
+      gameConfig.dailyGoalCount,
+      day.value,
+      unlockedChars
+    )
+
+    dailyCharacterBaseline.value = characters.value
+      .filter(c => c.unlocked)
+      .map(c => ({
+        id: c.id,
+        affinity: c.affinity,
+        mood: c.mood
+      }))
+
+    chattedCharacters.value = []
+  }
+
+  function getCharacterBaseline(characterId: string): CharacterBaseline | undefined {
+    return dailyCharacterBaseline.value.find(b => b.id === characterId)
+  }
+
+  function updateDailyGoalProgress(action: string, characterId?: string, affinityChange?: number) {
+    dailyGoals.value.forEach(goal => {
+      if (goal.completed) return
+
+      switch (goal.type) {
+        case 'chat':
+          if (action === 'chat') {
+            if (goal.characterId) {
+              if (characterId === goal.characterId) {
+                goal.currentCount++
+              }
+            } else {
+              goal.currentCount++
+            }
+          }
+          break
+
+        case 'gift':
+          if (action === 'gift') {
+            if (goal.characterId) {
+              if (characterId === goal.characterId) {
+                goal.currentCount++
+              }
+            } else {
+              goal.currentCount++
+            }
+          }
+          break
+
+        case 'work':
+          if (action === 'work') {
+            goal.currentCount++
+          }
+          break
+
+        case 'affinity':
+          if (action === 'chat' || action === 'gift') {
+            if (goal.characterId && characterId === goal.characterId) {
+              const baseline = getCharacterBaseline(characterId)
+              const charState = getCharacterState(characterId)
+              if (baseline && charState) {
+                goal.currentValue = Math.max(0, charState.affinity - baseline.affinity)
+              }
+            } else if (!goal.characterId && characterId) {
+              const baseline = getCharacterBaseline(characterId)
+              const charState = getCharacterState(characterId)
+              if (baseline && charState) {
+                const gain = charState.affinity - baseline.affinity
+                if (gain > (goal.currentValue || 0)) {
+                  goal.currentValue = gain
+                }
+              }
+            }
+          }
+          break
+
+        case 'mood':
+          if (action === 'chat' || action === 'gift') {
+            if (characterId) {
+              const charState = getCharacterState(characterId)
+              if (charState && charState.mood >= (goal.targetValue || 60)) {
+                goal.currentCount = 1
+              }
+            }
+          }
+          break
+
+        case 'multi_chat':
+          if (action === 'chat' && characterId) {
+            if (!chattedCharacters.value.includes(characterId)) {
+              chattedCharacters.value.push(characterId)
+            }
+            goal.currentCount = chattedCharacters.value.length
+          }
+          break
+      }
+
+      checkGoalCompletion(goal)
+    })
+  }
+
+  function checkGoalCompletion(goal: DailyGoal) {
+    if (goal.completed) return
+
+    let isCompleted = false
+
+    if (goal.type === 'affinity') {
+      isCompleted = (goal.currentValue || 0) >= (goal.targetValue || 0)
+    } else if (goal.type === 'mood') {
+      isCompleted = goal.currentCount >= goal.targetCount
+    } else {
+      isCompleted = goal.currentCount >= goal.targetCount
+    }
+
+    if (isCompleted && !goal.completed) {
+      goal.completed = true
+      addLog('system', `🎯 完成目标：${goal.title}（可领取 ${goal.reward} 代币）`)
+    }
+  }
+
+  function claimGoalReward(goalId: string): boolean {
+    const goal = dailyGoals.value.find(g => g.id === goalId)
+    if (!goal || !goal.completed || goal.claimed) return false
+
+    goal.claimed = true
+    resources.value += goal.reward
+    addLog('system', `🎁 领取目标奖励：${goal.reward} 代币`)
+    return true
+  }
+
+  function claimAllDailyRewards(): number {
+    let total = 0
+    dailyGoals.value.forEach(goal => {
+      if (goal.completed && !goal.claimed) {
+        goal.claimed = true
+        total += goal.reward
+      }
+    })
+    if (total > 0) {
+      resources.value += total
+      addLog('system', `🎁 领取全部每日奖励：${total} 代币`)
+    }
+    return total
+  }
+
   function advanceTime() {
     const nextSlot = getNextTimeSlot(timeSlot.value, gameConfig.timeSlots)
     if (nextSlot === gameConfig.timeSlots[0]) {
@@ -197,7 +383,10 @@ export const useGameStore = defineStore('game', () => {
       }
     })
 
+    initDailyGoals()
+
     addLog('system', `🌅 第 ${day.value} 天开始了`)
+    addLog('system', '📋 今日目标已刷新')
   }
 
   function performAction(actionType: ActionType, targetId?: string, giftId?: string) {
@@ -260,6 +449,7 @@ export const useGameStore = defineStore('game', () => {
     }
 
     addLog('action', message, characterId)
+    updateDailyGoalProgress('chat', characterId, affinityChange)
     advanceTime()
     return true
   }
@@ -301,6 +491,7 @@ export const useGameStore = defineStore('game', () => {
     }
 
     addLog('action', message, characterId)
+    updateDailyGoalProgress('gift', characterId, affinityChange)
     advanceTime()
     return true
   }
@@ -317,6 +508,7 @@ export const useGameStore = defineStore('game', () => {
     })
 
     addLog('action', `💼 打工赚了 ${earned} 代币（角色们的心情略有下降）`)
+    updateDailyGoalProgress('work')
     advanceTime()
     return true
   }
@@ -437,17 +629,24 @@ export const useGameStore = defineStore('game', () => {
     flags.value = []
     triggeredEvents.value = []
     collectedCards.value = []
+    dailyGoals.value = []
+    dailyCharacterBaseline.value = []
+    chattedCharacters.value = []
     logs.value = []
     history.value = []
     logIdCounter = 0
 
     addLog('system', '🎮 游戏开始！欢迎来到恋爱物语')
+    initDailyGoals()
     checkAndTriggerEvent()
   }
 
   function initGame() {
     if (logs.value.length === 0) {
       addLog('system', '🎮 游戏开始！欢迎来到恋爱物语')
+    }
+    if (dailyGoals.value.length === 0) {
+      initDailyGoals()
     }
     checkAndTriggerEvent()
   }
@@ -465,6 +664,10 @@ export const useGameStore = defineStore('game', () => {
     flags,
     triggeredEvents,
     collectedCards,
+    dailyGoals,
+    completedGoals,
+    totalDailyReward,
+    unclaimedGoalsCount,
     logs,
     history,
     currentEvent,
@@ -482,6 +685,9 @@ export const useGameStore = defineStore('game', () => {
     toggleDarkMode,
     resetGame,
     initGame,
-    checkAndTriggerEvent
+    checkAndTriggerEvent,
+    claimGoalReward,
+    claimAllDailyRewards,
+    initDailyGoals
   }
 })
