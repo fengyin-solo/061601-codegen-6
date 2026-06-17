@@ -69,22 +69,27 @@ export const useSaveStore = defineStore('save', () => {
   function deserializeGameState(data: string): boolean {
     try {
       const state = JSON.parse(data)
-      gameStore.day = state.day
-      gameStore.timeSlot = state.timeSlot
-      gameStore.actionsRemaining = state.actionsRemaining
-      gameStore.resources = state.resources
-      gameStore.characters = state.characters
-      gameStore.selectedCharacterId = state.selectedCharacterId
-      gameStore.flags = state.flags
-      gameStore.triggeredEvents = state.triggeredEvents
-      gameStore.collectedCards = state.collectedCards
-      gameStore.dailyGoals = state.dailyGoals || []
-      gameStore.dailyCharacterBaseline = state.dailyCharacterBaseline || []
-      gameStore.chattedCharacters = state.chattedCharacters || []
-      gameStore.logs = state.logs
-      gameStore.history = state.history
-      gameStore.darkMode = state.darkMode
-      return true
+      const restored = gameStore.restoreState({
+        day: state.day,
+        timeSlot: state.timeSlot,
+        actionsRemaining: state.actionsRemaining,
+        resources: state.resources,
+        characters: state.characters,
+        selectedCharacterId: state.selectedCharacterId,
+        flags: state.flags,
+        triggeredEvents: state.triggeredEvents,
+        collectedCards: state.collectedCards,
+        dailyGoals: state.dailyGoals,
+        dailyCharacterBaseline: state.dailyCharacterBaseline,
+        chattedCharacters: state.chattedCharacters,
+        logs: state.logs,
+        history: state.history,
+        darkMode: state.darkMode
+      })
+      if (restored) {
+        gameStore.initGame()
+      }
+      return restored
     } catch (e) {
       console.error('Failed to deserialize game state:', e)
       return false
@@ -122,7 +127,6 @@ export const useSaveStore = defineStore('save', () => {
     const success = deserializeGameState(slot.data)
     if (success) {
       gameStore.addLog('system', `📂 已加载存档 ${slotId}`)
-      gameStore.checkAndTriggerEvent()
     }
     return success
   }

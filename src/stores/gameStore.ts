@@ -641,6 +641,60 @@ export const useGameStore = defineStore('game', () => {
     checkAndTriggerEvent()
   }
 
+  interface RestoreStateData {
+    day: number
+    timeSlot: TimeOfDay
+    actionsRemaining: number
+    resources: number
+    characters: CharacterState[]
+    selectedCharacterId: string | null
+    flags: string[]
+    triggeredEvents: string[]
+    collectedCards: string[]
+    dailyGoals?: DailyGoal[]
+    dailyCharacterBaseline?: CharacterBaseline[]
+    chattedCharacters?: string[]
+    logs: LogEntry[]
+    history: HistorySnapshot[]
+    darkMode: boolean
+  }
+
+  function restoreState(data: RestoreStateData): boolean {
+    try {
+      day.value = data.day
+      timeSlot.value = data.timeSlot
+      actionsRemaining.value = data.actionsRemaining
+      resources.value = data.resources
+      characters.value = Array.isArray(data.characters)
+        ? data.characters.map(c => ({ ...c }))
+        : []
+      selectedCharacterId.value = data.selectedCharacterId
+      flags.value = Array.isArray(data.flags) ? [...data.flags] : []
+      triggeredEvents.value = Array.isArray(data.triggeredEvents) ? [...data.triggeredEvents] : []
+      collectedCards.value = Array.isArray(data.collectedCards) ? [...data.collectedCards] : []
+      dailyGoals.value = Array.isArray(data.dailyGoals)
+        ? data.dailyGoals.map(g => ({ ...g }))
+        : []
+      dailyCharacterBaseline.value = Array.isArray(data.dailyCharacterBaseline)
+        ? data.dailyCharacterBaseline.map(b => ({ ...b }))
+        : []
+      chattedCharacters.value = Array.isArray(data.chattedCharacters)
+        ? [...data.chattedCharacters]
+        : []
+      logs.value = Array.isArray(data.logs)
+        ? data.logs.map(l => ({ ...l }))
+        : []
+      history.value = Array.isArray(data.history)
+        ? JSON.parse(JSON.stringify(data.history))
+        : []
+      darkMode.value = data.darkMode
+      return true
+    } catch (e) {
+      console.error('Failed to restore game state:', e)
+      return false
+    }
+  }
+
   function initGame() {
     if (logs.value.length === 0) {
       addLog('system', '🎮 游戏开始！欢迎来到恋爱物语')
@@ -688,6 +742,7 @@ export const useGameStore = defineStore('game', () => {
     checkAndTriggerEvent,
     claimGoalReward,
     claimAllDailyRewards,
-    initDailyGoals
+    initDailyGoals,
+    restoreState
   }
 })
